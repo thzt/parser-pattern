@@ -49,7 +49,7 @@ const lexer = function* (input) {
         });
 
         if (!isRecognized) {
-            throw new Error(`unrecognized characters: ${cursor.source.slice(cursor.position)}`);
+            throw new Error(`unrecognized characters: ${cursor.source.slice(cursor.position)}, at position: ${cursor.position}`);
         }
 
         yield token;
