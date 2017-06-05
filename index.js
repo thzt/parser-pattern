@@ -1,7 +1,7 @@
 import lexer from './src/lexer';
 import parser from './src/parser';
 
-const tokens = lexer('[abc, def]');
+const tokens = lexer('[abc, [def, ghi]]');
+const tree = parser(tokens);
 
-parser(tokens);
-console.log('ok');
+console.log(tree.toString());

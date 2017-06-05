@@ -10,6 +10,7 @@
 import 'babel-polyfill';
 
 import accumulate from '../util/accumulate';
+import consume from '../util/consume';
 import Token from '../util/token';
 
 const isWS = c => c === ' ' || c === '\t' || c === '\n' || c === '\r';
@@ -19,11 +20,11 @@ const isRBRACK = c => c === ']';
 const isNAME = c => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 
 const actions = [
-    { filter: isWS, type: 'WS' },
-    { filter: isCOMMA, type: 'COMMA' },
-    { filter: isLBRACK, type: 'LBRACK' },
-    { filter: isRBRACK, type: 'RBRACK' },
-    { filter: isNAME, type: 'NAME' },
+    { filter: isWS, type: 'WS', isAccumulate: true },
+    { filter: isCOMMA, type: 'COMMA', isAccumulate: false },
+    { filter: isLBRACK, type: 'LBRACK', isAccumulate: false },
+    { filter: isRBRACK, type: 'RBRACK', isAccumulate: false },
+    { filter: isNAME, type: 'NAME', isAccumulate: true },
 ];
 
 const lexer = function* (input) {
@@ -38,8 +39,10 @@ const lexer = function* (input) {
         }
 
         let token;
-        const isRecognized = actions.some(({ filter, type }) => {
-            const text = accumulate(cursor, filter);
+        const isRecognized = actions.some(({ filter, type, isAccumulate }) => {
+            const handler = isAccumulate ? accumulate : consume;
+
+            const text = handler(cursor, filter);
             if (text === '') {
                 return false;
             }

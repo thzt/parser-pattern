@@ -3741,23 +3741,28 @@ var _accumulate = __webpack_require__(300);
 
 var _accumulate2 = _interopRequireDefault(_accumulate);
 
+var _consume = __webpack_require__(305);
+
+var _consume2 = _interopRequireDefault(_consume);
+
 var _token = __webpack_require__(302);
 
 var _token2 = _interopRequireDefault(_token);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+/*
+    list : '[' elements ']' ;
+    elements : element (',' element)* ;
+    element : NAME | list ;
+
+    NAME : ('a'..'z' | 'A'..'Z')+ ;
+    WS : ' ' | '\t' | '\n' | '\r' ;
+*/
+
 var isWS = function isWS(c) {
     return c === ' ' || c === '\t' || c === '\n' || c === '\r';
-}; /*
-       list : '[' elements ']' ;
-       elements : element (',' element)* ;
-       element : NAME | list ;
-   
-       NAME : ('a'..'z' | 'A'..'Z')+ ;
-       WS : ' ' | '\t' | '\n' | '\r' ;
-   */
-
+};
 var isCOMMA = function isCOMMA(c) {
     return c === ',';
 };
@@ -3771,7 +3776,7 @@ var isNAME = function isNAME(c) {
     return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
 };
 
-var actions = [{ filter: isWS, type: 'WS' }, { filter: isCOMMA, type: 'COMMA' }, { filter: isLBRACK, type: 'LBRACK' }, { filter: isRBRACK, type: 'RBRACK' }, { filter: isNAME, type: 'NAME' }];
+var actions = [{ filter: isWS, type: 'WS', isAccumulate: true }, { filter: isCOMMA, type: 'COMMA', isAccumulate: false }, { filter: isLBRACK, type: 'LBRACK', isAccumulate: false }, { filter: isRBRACK, type: 'RBRACK', isAccumulate: false }, { filter: isNAME, type: 'NAME', isAccumulate: true }];
 
 var lexer = regeneratorRuntime.mark(function lexer(input) {
     var cursor, token, isRecognized;
@@ -3801,9 +3806,12 @@ var lexer = regeneratorRuntime.mark(function lexer(input) {
                     token = void 0;
                     isRecognized = actions.some(function (_ref) {
                         var filter = _ref.filter,
-                            type = _ref.type;
+                            type = _ref.type,
+                            isAccumulate = _ref.isAccumulate;
 
-                        var text = (0, _accumulate2.default)(cursor, filter);
+                        var handler = isAccumulate ? _accumulate2.default : _consume2.default;
+
+                        var text = handler(cursor, filter);
                         if (text === '') {
                             return false;
                         }
@@ -3852,52 +3860,69 @@ var _filterIterator = __webpack_require__(301);
 
 var _filterIterator2 = _interopRequireDefault(_filterIterator);
 
+var _syntaxTree = __webpack_require__(304);
+
+var _syntaxTree2 = _interopRequireDefault(_syntaxTree);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var match = function match(type, nextToken, tokens) {
+/*
+    list : '[' elements ']' ;
+    elements : element (',' element)* ;
+    element : NAME | list ;
+
+    NAME : ('a'..'z' | 'A'..'Z')+ ;
+    WS : ' ' | '\t' | '\n' | '\r' ;
+*/
+
+var match = function match(type, nextToken, tokens, parent) {
     if (nextToken.type !== type) {
         throw new Error('expect type ' + type + ', token ' + nextToken);
     }
 
+    var tree = new _syntaxTree2.default(type, nextToken.text, null);
+    parent.addSubTree(tree);
+
     nextToken = tokens.next().value;
     return nextToken;
-}; /*
-       list : '[' elements ']' ;
-       elements : element (',' element)* ;
-       element : NAME | list ;
-   
-       NAME : ('a'..'z' | 'A'..'Z')+ ;
-       WS : ' ' | '\t' | '\n' | '\r' ;
-   */
+};
 
-var list = function list(nextToken, tokens) {
-    nextToken = match('LBRACK', nextToken, tokens);
-    nextToken = elements(nextToken, tokens);
-    nextToken = match('RBRACK', nextToken, tokens);
+var list = function list(nextToken, tokens, parent) {
+    var tree = new _syntaxTree2.default('list', null, []);
+    parent.addSubTree(tree);
+
+    nextToken = match('LBRACK', nextToken, tokens, tree);
+    nextToken = elements(nextToken, tokens, tree);
+    nextToken = match('RBRACK', nextToken, tokens, tree);
 
     return nextToken;
 };
 
-var elements = function elements(nextToken, tokens) {
-    nextToken = element(nextToken, tokens);
+var elements = function elements(nextToken, tokens, parent) {
+    var tree = new _syntaxTree2.default('elements', null, []);
+    parent.addSubTree(tree);
 
+    nextToken = element(nextToken, tokens, tree);
     while (true) {
         if (nextToken.type !== 'COMMA') {
             return nextToken;
         }
 
-        nextToken = match('COMMA', nextToken, tokens);
-        nextToken = element(nextToken, tokens);
+        nextToken = match('COMMA', nextToken, tokens, tree);
+        nextToken = element(nextToken, tokens, tree);
     }
 };
 
-var element = function element(nextToken, tokens) {
+var element = function element(nextToken, tokens, parent) {
+    var tree = new _syntaxTree2.default('element', null, []);
+    parent.addSubTree(tree);
+
     if (nextToken.type === 'NAME') {
-        nextToken = match('NAME', nextToken, tokens);
+        nextToken = match('NAME', nextToken, tokens, tree);
         return nextToken;
     }
 
-    nextToken = list(nextToken, tokens);
+    nextToken = list(nextToken, tokens, tree);
     return nextToken;
 };
 
@@ -3910,8 +3935,9 @@ var parser = function parser(tokens) {
         done = _filteredTokens$next.done,
         nextToken = _filteredTokens$next.value;
 
-    nextToken = list(nextToken, filteredTokens);
-    return nextToken;
+    var tree = new _syntaxTree2.default('program', null, []);
+    nextToken = list(nextToken, filteredTokens, tree);
+    return tree;
 };
 
 exports.default = parser;
@@ -3933,10 +3959,10 @@ var _parser2 = _interopRequireDefault(_parser);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var tokens = (0, _lexer2.default)('[abc, def]');
+var tokens = (0, _lexer2.default)('[abc, [def, ghi]]');
+var tree = (0, _parser2.default)(tokens);
 
-(0, _parser2.default)(tokens);
-console.log('ok');
+console.log(tree.toString());
 
 /***/ }),
 /* 117 */
@@ -9390,6 +9416,96 @@ module.exports = function (module) {
 	}
 	return module;
 };
+
+/***/ }),
+/* 304 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var SyntaxTree = function () {
+    function SyntaxTree(type, value, children) {
+        _classCallCheck(this, SyntaxTree);
+
+        var tree = this;
+        tree.type = type;
+        tree.children = children;
+        tree.value = value;
+    }
+
+    _createClass(SyntaxTree, [{
+        key: "addSubTree",
+        value: function addSubTree(child) {
+            var tree = this;
+            var children = tree.children;
+
+
+            children.push(child);
+            return tree;
+        }
+    }, {
+        key: "_toJSON",
+        value: function _toJSON() {
+            var tree = this;
+            var type = tree.type,
+                value = tree.value,
+                children = tree.children;
+
+
+            var json = {
+                type: type
+            };
+
+            value != null && (json.value = value);
+            children != null && (json.children = children.map(function (child) {
+                return tree._toJSON.call(child);
+            }));
+            return json;
+        }
+    }, {
+        key: "toString",
+        value: function toString() {
+            var tree = this;
+            var json = tree._toJSON();
+            return JSON.stringify(json, null, 4);
+        }
+    }]);
+
+    return SyntaxTree;
+}();
+
+exports.default = SyntaxTree;
+
+/***/ }),
+/* 305 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+var consume = function consume(cursor, filter) {
+    var character = cursor.source[cursor.position];
+    if (!filter(character)) {
+        return '';
+    }
+
+    cursor.position++;
+    return character;
+};
+
+exports.default = consume;
 
 /***/ })
 /******/ ]);
