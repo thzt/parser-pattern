@@ -1,6 +1,7 @@
 import lexer from './src/lexer';
+import parser from './src/parser';
 
-const tokens = lexer('[abc, def, 0]');
-[...tokens].forEach(token => {
-    console.log(token.toString());
-})
+const tokens = lexer('[abc, def]');
+
+parser(tokens);
+console.log('ok');
